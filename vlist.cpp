@@ -30,10 +30,6 @@ void VList::InsertBefore(VList* before)
 
 void VList::ConvetToPair(TPairType* val) {
     TPair* last = list.get();
-    if (last->head == nullptr) {
-        last->head.reset(val);
-        return;
-    }
     while (last->tail != nullptr) {
         if (last->tail->GetType() == PT_List) {
             last = ((TPairTypeList*)last->tail.get())->GetValue()->list.get();
@@ -110,22 +106,25 @@ void GetPairData(TPairType* expr)
 void VList::GetListData()
 {
     TPair* last = list.get();
+    if (last->head == nullptr && last->tail != nullptr) {
+        GetPairData(last->tail.get());
+        return;
+    } else if (last->head == nullptr && last->tail == nullptr) {
+       std::cout << "( )";
+       return;
+    }
     std::cout << "( ";
-    do {
-        if (last->head != nullptr) {
-            GetPairData(last->head.get());
-        } else {
-            std::cout << ") ";
-            return;
-        }
+    while(last->tail != nullptr) {
+        GetPairData(last->head.get());
         if (last->tail->GetType() == PT_List) {
             last = ((TPairTypeList*)last->tail.get())->GetValue()->list.get();
         } else {
             std::cout << ". ";
             GetPairData(last->tail.get());
-            break;
+            std::cout << ") ";
+            return;
         }
-    } while(last->tail != nullptr);
+    }
     GetPairData(last->head.get());
     std::cout << ") ";
 }

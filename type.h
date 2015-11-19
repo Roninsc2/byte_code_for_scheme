@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <vlist.h>
+#include <map>
 
 
 enum EType {
@@ -20,13 +21,15 @@ class ExprType {
 public:
     virtual ~ExprType(){}
     EType Type;
+    size_t level;
 };
 
 class NumberIntType : public ExprType {
 
 public:
-    NumberIntType(int val) : value(val) {
+    NumberIntType(int val, size_t lvl) : value(val) {
         Type = T_Int;
+        level = lvl;
     }
 
 public:
@@ -36,8 +39,9 @@ public:
 class NumberDoubleType : public ExprType {
 
 public:
-    NumberDoubleType(double val) : value(val) {
+    NumberDoubleType(double val, size_t lvl) : value(val) {
         Type = T_Double;
+        level = lvl;
     }
 
 public:
@@ -48,20 +52,25 @@ public:
 class IdentType : public ExprType {
 
 public:
-    IdentType(std::string val) : name(val) {
+    IdentType(std::string val, size_t lvl) : name(val) {
         Type = T_Ident;
+        level = lvl;
+    }
+    ~IdentType() {
+        delete value;
     }
 
 public:
     std::string name;
-    ExprType* value;
+    ExprType* value = nullptr;
 };
 
 class StringType : public ExprType {
 
 public:
-    StringType(std::string val) : value(val) {
+    StringType(std::string val, size_t lvl) : value(val) {
         Type = T_String;
+        level = lvl;
     }
 
 public:
@@ -71,8 +80,9 @@ public:
 class CharType : public ExprType {
 
 public:
-    CharType(char val) : value(val) {
+    CharType(char val, size_t lvl) : value(val) {
         Type = T_Char;
+        level = lvl;
     }
 
 public:
@@ -82,8 +92,9 @@ public:
 class BoolType : public ExprType {
 
 public:
-    BoolType(bool val) : value(val) {
+    BoolType(bool val, size_t lvl) : value(val) {
         Type = T_Bool;
+        level = lvl;
     }
 
 public:
@@ -93,8 +104,9 @@ public:
 class SymbolType : public ExprType {
 
 public:
-    SymbolType(std::string val) : value(val) {
+    SymbolType(std::string val, size_t lvl) : value(val) {
         Type = T_Symbol;
+        level = lvl;
     }
 
 public:
@@ -104,11 +116,35 @@ public:
 class ListType : public ExprType {
 
 public:
-    ListType(VList* val) : value(val) {
+    ListType(VList* val, size_t lvl) : value(val) {
         Type = T_List;
+        level = lvl;
     }
 
 public:
     std::shared_ptr<VList> value;
 };
 
+
+class PrototypeType {
+public:
+  PrototypeType(const std::string &name, const std::map<std::string, IdentType*> &args)
+    : Name(name), Args(args)
+  {
+  }
+public:
+  std::string Name;
+  std::map<std::string, IdentType*> Args;
+};
+
+
+class FunctionType {
+public:
+  FunctionType(PrototypeType* proto,  std::vector< std::string > body)
+    : Proto(proto), Body(body)
+  {
+  }
+public:
+  std::shared_ptr< PrototypeType >Proto;
+  std::vector< std::string >Body;
+};

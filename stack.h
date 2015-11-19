@@ -3,6 +3,7 @@
 #include <string>
 #include <cctype>
 #include <vector>
+#include <map>
 #include "type.h"
 
 class TStack {
@@ -15,8 +16,11 @@ private:
     void ParseLine(std::string line);
     void ParseDoFunc(std::string func);
     ExprType* ParseAdd(std::string addLine);
+    void ParseDefine(std::string line);
     void PrintResult();
 private:
     std::ifstream fin;
     std::vector< ExprType* > stack;
+    std::map<std::string, IdentType* > defineVar;
+    std::map<std::string, FunctionType* > defineFunc;
 };
