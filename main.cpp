@@ -2,6 +2,6 @@
 
 int main()
 {
-    TStack stack("out.txt");
+    TStack stack("out.bin");
     return 0;
 }

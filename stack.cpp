@@ -5,10 +5,26 @@
 
 TStack::TStack(const std::string fileName)
 {
-    fin.open(fileName);
+    fin.open(fileName, std::ios::binary|std::ios::in);
     if (!fin.is_open()) {
         return;
     }
+    fin.seekg(0, fin.end);
+    size_t len = fin.tellg();
+    fin.seekg(0, fin.beg);
+    Buffer.resize(len);
+    fin.read((char*)(&Buffer[0]), len);
+    while (Allocator()) {
+    }
+    stdFuncMap.insert(std::make_pair("+", &plus));
+    stdFuncMap.insert(std::make_pair("-", &minus));
+    stdFuncMap.insert(std::make_pair("/", &division));
+    stdFuncMap.insert(std::make_pair("*", &mult));
+    stdFuncMap.insert(std::make_pair("cons", &cons));
+    stdFuncMap.insert(std::make_pair("append", &append));
+    stdFuncMap.insert(std::make_pair("list", &list));
+    stdFuncMap.insert(std::make_pair("=", &equally));
+    stdFuncMap.insert(std::make_pair("define", &defineFun));
     DoCode();
     PrintResult();
 }
@@ -20,219 +36,294 @@ TStack::~TStack()
 
 void TStack::DoCode()
 {
-    char c;
-    std::string line;
-    while (!fin.eof()) {
-        c = GetChar();
-        if (c == '\n') {
-            ParseLine(line);
-            line = "";
-        } else {
-            line += c;
-        }
-    }
-}
-
-char TStack::GetChar()
-{
-    char c;
-    fin.get(c);
-    return c;
-}
-
-void TStack::ParseLine(std::string line)
-{
-    std::string command;
-    size_t i = 0;
-    while(line.at(i) != ' ') {
-        command += line.at(i);
-        i++;
-    }
-    line.erase(0, i+1);
-    if (command == "ADD") {
-        stack.push_back(ParseAdd(line));
-    } else if (command == "DOFUNC") {
-        ParseDoFunc(line);
-    } else if (command == "DEFINE") {
-        ParseDefine(line);
-    }
-
-}
-
-void TStack::ParseDoFunc(std::string func) {
-    size_t lvl = func[0]-48;
-    std::vector <ExprType*> expr;
-    std::vector <ExprType* > newStack;
-    for (size_t i = 0; i < stack.size(); i++) {
-        if (stack[i]->level == lvl) {
-            expr.push_back(stack[i]);
-        }
-    }
-    func.erase(0,2);
-    for (size_t i = 0; i < stack.size(); i++) {
-        if (stack[i]->level != lvl) {
-            newStack.push_back(stack[i]);
-        }
-    }
-    size_t offset;
-    if (lvl == 0) {
-        offset = 0;
-    } else {
-        offset = 1;
-    }
-    if (func == "+") {
-        newStack.push_back(new NumberDoubleType(plus(expr), lvl-offset));
-    } else if (func == "append") {
-        newStack.push_back(new ListType(append(expr), lvl-offset));
-    } else if (func == "cons") {
-        newStack.push_back(new ListType(cons(expr), lvl-offset));
-    } else if (func == "list") {
-        newStack.push_back(new ListType(list(expr), lvl-offset));
-    } else if (func == "-") {
-        newStack.push_back(new NumberDoubleType(minus(expr), lvl-offset));
-    } else if (func == "*") {
-        newStack.push_back(new NumberDoubleType(mult(expr), lvl-offset));
-    } else if (func == "/") {
-        newStack.push_back(new NumberDoubleType(division(expr), lvl-offset));
-    } else if (func == "define") {
-        defineVar.insert(defineFun(expr));
-    } else if (defineFunc.count(func)) {
-        if (defineFunc.at(func)->Proto->Args.size() == expr.size()) {
-            size_t j = 0;
-            for (std::map<std::string, IdentType*>::iterator i = defineFunc.at(func)->Proto->Args.begin(); i != defineFunc.at(func)->Proto->Args.end(); i++) {
-                i->second->value = expr[j];
-                j++;
-            }
-        }
-        std::map<std::string, IdentType* > defineVarTemp = defineFunc.at(func)->Proto->Args;
-        defineVar.swap(defineVarTemp);
-        for (size_t i = 0; i < defineFunc.at(func)->Body.size(); i++) {
-            ParseLine(defineFunc.at(func)->Body[i]);
-        }
-        defineVar = defineVarTemp;
-    } else {
-        return;
-    }
-    stack = newStack;
-}
-
-void TStack::ParseDefine(std::string line)
-{
-    std::string name;
-    size_t i = 0;
-    while (line[i] != ' ') {
-        name += line[i];
-        i++;
-    }
-    i++;
-    std::map<std::string, IdentType*> args;
-    std::string argName;
-    while (true) {
-        if (line[i] == '\0') {
+    while (Buffer.length() > 0) {
+        Command cmd = (Command)Buffer.at(0);
+        switch (cmd) {
+        case CMD_PUSH: {
+            stack.push_back(ParseCmdPush());
             break;
         }
-        if (line[i] == ' ') {
-            args.insert(std::pair< std::string, IdentType*>(argName, new IdentType(argName, 0)));
-            argName = "";
-        } else {
-            argName += line[i];
-        }
-        i++;
-    }
-    char c;
-    line = "";
-    std::vector<std::string> body;
-    while (true) {
-        c = GetChar();
-        if (fin.eof() || line == "ENDDEFINE") {
-            GetChar();
-            //error
+        case CMD_PUSHIDENT: {
+            stack.push_back(ParseCmdPushIdent());
             break;
         }
-        if (c == '\n') {
-            body.push_back(line);
-            line = "";
-        } else {
-            line += c;
+        case CMD_CALL: {
+            stack.push_back(ParseCmdCall());
+            break;
+        }
+        case CMD_DEFSTART: {
+            defineFunc.insert(ParseCmdDefine());
+            break;
+        }
+        case CMD_IFELSE: {
+            stack.push_back(ParseCmdIfElse());
+            break;
+        }
+        case CMD_TAILCALL: {
+            stack.push_back(ParseCmdTailCall());
+            break;
+        }
+        default:
+            break;
         }
     }
-    defineFunc.insert(std::pair<std::string, FunctionType*>(name, new FunctionType(new PrototypeType(name, args), body)));
-
 }
 
-ExprType* TStack::ParseAdd(std::string addLine) {
-    size_t level = (size_t)(addLine[0]-48);
-    EType typeNumber = (EType)(addLine[2]-48);
-    addLine.erase(0, 4);
-    switch (typeNumber) {
-    case T_Ident://
-        if (defineVar.count(addLine)) {
-            return defineVar.at(addLine);
-        }
-        return (new IdentType(addLine, level));
-    case T_Bool: {
-        if (addLine == "#t")  {
-            return (new BoolType(true, level));
-        } else {
-            return (new BoolType(false, level));
-        }
+bool TStack::Allocator()
+{
+    size_t size = *(unsigned short*)(Buffer.data());
+    Command allocCMD = (Command)Buffer.at(0);
+    if (allocCMD != CMD_AllOC) {
+        return false;
     }
-    case T_String : {
-        std::string val = addLine;
-        val.erase(0,1);
-        val.erase(val.size()-1, val.size());
-        return (new StringType(val, level));
+    ValueType allocType = (ValueType)Buffer.at(1);
+    imemstream in(Buffer.data() + 2, size - 1);
+    switch (allocType) {
+    case VT_INT: {
+        int val;
+        LoadMany(in, val);
+        allocator.push_back(new NumberIntType(val));
+        Buffer.erase(0, 2+sizeof(int));
+        break;
     }
-    case T_Symbol : {
-        return (new SymbolType(addLine, level));
+    case VT_DOUBLE: {
+        double val;
+        LoadMany(in, val);
+        allocator.push_back(new NumberDoubleType(val));
+        Buffer.erase(0, 2+sizeof(double));
+        break;
     }
-    case T_Char : {
-        return (new CharType(addLine[0], level));
+    case VT_STRING: {
+        std::string val;
+        LoadMany(in, val);
+        allocator.push_back(new StringType(val));
+        Buffer.erase(0, 4+val.length());
+        break;
     }
-    case T_Int : {
-        int val  = std::stoi(addLine);
-        return (new NumberIntType(val, level));
+    case VT_SYMBOL: {
+        std::string val;
+        LoadMany(in, val);
+        allocator.push_back(new SymbolType(val));
+        Buffer.erase(0, 4 + val.length());
+        break;
     }
-    case T_Double : {
-        double val  =  std::stod(addLine);
-        return (new NumberDoubleType(val, level));
+    case VT_CHAR: {
+        char val;
+        LoadMany(in, val);
+        allocator.push_back(new CharType(val));
+        Buffer.erase(0, 2+sizeof(char));
+        break;
+    }
+    case VT_BOOL: {
+        bool val;
+        LoadMany(in, val);
+        allocator.push_back(new BoolType(val));
+        Buffer.erase(0, 2+sizeof(bool));
+        break;
     }
     default:
-        break;//error
+        break;
     }
+    return true;
+}
+
+ExprType *TStack::ParseCmdPush()
+{
+    size_t size = *(unsigned short*)(Buffer.data());
+    imemstream in(Buffer.data() + 1, size - 1);
+    size_t val;
+    LoadMany(in, val);
+    Buffer.erase(0, 1+sizeof(size_t));
+    return allocator.at(val);
+}
+
+ExprType *TStack::ParseCmdPushIdent()
+{
+    size_t size = *(unsigned short*)(Buffer.data());
+    imemstream in(Buffer.data() + 1, size - 1);
+    std::string val;
+    LoadMany(in, val);
+    Buffer.erase(0, 3+val.length());
+    return defineVar.at(val)->value;
+}
+
+ExprType* TStack::ParseCmdCall()
+{
+    size_t size = *(unsigned short*)(Buffer.data());
+    imemstream in(Buffer.data() + 1, size - 1);
+    std::string name;
+    LoadMany(in, name);
+    Buffer.erase(0, 3 + name.length());
+    std::vector<ExprType*> exprs;
+    while (Buffer.length() > 0) {
+        Command cmd = (Command)Buffer.at(0);
+        if (cmd == CMD_ENDCALL) {
+            Buffer.erase(0, 1);
+            break;
+        }
+        switch (cmd) {
+        case CMD_PUSH: {
+            exprs.push_back(ParseCmdPush());
+            break;
+        }
+        case CMD_PUSHIDENT: {
+            exprs.push_back(ParseCmdPushIdent());
+            break;
+        }
+        case CMD_CALL: {
+            exprs.push_back(ParseCmdCall());
+            break;
+        }
+        case CMD_IFELSE: {
+            exprs.push_back(ParseCmdIfElse());
+            break;
+        }
+        case CMD_TAILCALL: {
+            exprs.push_back(ParseCmdTailCall());
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    if (name == "define") {
+        IdentType* ident = (IdentType*)stdFuncMap.at(name)(exprs);
+        defineVar.insert(std::make_pair(ident->name, ident));
+    }
+    if (stdFuncMap.count(name)) {
+        return (stdFuncMap.at(name)(exprs));
+    } else if (defineFunc.count(name)) {
+        if (exprs.size() == defineFunc.at(name)->Proto->Args.size()) {
+            size_t j = 0;
+            ExprType* result;
+            std::map<std::string, IdentType* > defineVarBuffer = defineVar;
+            std::map<std::string, FunctionType* > defineFuncBuffer = defineFunc;
+            for (auto it = defineFunc.at(name)->Proto->Args.begin(); it != defineFunc.at(name)->Proto->Args.end(); it++) {
+                it->second->value = exprs.at(j);
+                if (defineVar.count(it->first)) {
+                    defineVar.erase(it->first);
+                }
+                defineVar.insert(std::make_pair(it->first, it->second));
+                j++;
+            }
+            std::string BufferTemp = Buffer;
+            Buffer = defineFunc.at(name)->Body;
+            while (Buffer.length() > 0) {
+                Command cmd = (Command)Buffer.at(0);
+                switch (cmd) {
+                case CMD_PUSH: {
+                    result = ParseCmdPush();
+                    break;
+                }
+                case CMD_PUSHIDENT: {
+                    result = ParseCmdPushIdent();
+                    break;
+                }
+                case CMD_CALL: {
+                    result = ParseCmdCall();
+                    break;
+                }
+                case CMD_DEFSTART: {
+                    std::pair<std::string, FunctionType*> currentFunc = ParseCmdDefine();
+                    if (defineFunc.count(currentFunc.first)) {
+                        defineFunc.erase(currentFunc.first);
+                    }
+                    defineFunc.insert(currentFunc);
+                    break;
+                }
+                case CMD_IFELSE: {
+                    result = ParseCmdIfElse();
+                    break;
+                }
+                case CMD_TAILCALL: {
+                    result = ParseCmdTailCall();
+                    break;
+                }
+                default:
+                    break;
+                }
+            }
+            defineVar = defineVarBuffer;
+            defineFunc = defineFuncBuffer;
+            Buffer = BufferTemp;
+            return result;
+        }
+    }
+}
+
+ExprType *TStack::ParseCmdTailCall()
+{
+
+}
+
+std::pair<std::string, FunctionType*> TStack::ParseCmdDefine()
+{
+    size_t size = *(unsigned short*)(Buffer.data());
+    imemstream in(Buffer.data() + 1, size - 1);
+    std::string funcName;
+    size_t sizeArgs;
+    LoadMany(in, funcName, sizeArgs);
+    std::map<std::string, IdentType*> args;
+    size_t forDelete = 3 + funcName.length() + sizeof(size_t);
+    for (size_t i = 0; i < sizeArgs; i++) {
+        std::string identName;
+        LoadMany(in, identName);
+        args.insert(std::make_pair(identName, new IdentType(identName)));
+        forDelete += 2 + identName.length();
+    }
+    Buffer.erase(0, forDelete);
+    PrototypeType* proto = new PrototypeType(funcName, args);
+    std::string Body;
+    while (Buffer.length() > 0) {
+        Command cmd = (Command)Buffer.at(0);
+        if (cmd == CMD_ENDDEF) {
+            Buffer.erase(0, 1);
+            break;
+        }
+        Body += Buffer.at(0);
+        Buffer.erase(0,1);
+    }
+    return (std::make_pair(funcName ,new FunctionType(proto, Body)));
+}
+
+ExprType *TStack::ParseCmdIfElse()
+{
+
 }
 
 void TStack::PrintResult()
 {
-    ExprType* result = stack[0];
-    switch(result->Type) {
-    case T_Bool:{
-        std::cout << ((BoolType*)result)->value << std::endl;
+    ExprType* expr = stack.at(stack.size()-1);
+    switch (expr->Type) {
+    case T_Int: {
+        std::cout << ((NumberIntType*)expr)->value << std::endl;
         break;
     }
-    case T_String:{
-        std::cout << ((StringType*)result)->value << std::endl;
+    case T_Double: {
+        std::cout << ((NumberDoubleType*)expr)->value << std::endl;
         break;
     }
-    case T_Int:{
-        std::cout << ((NumberIntType*)result)->value << std::endl;
+    case T_Symbol: {
+        std::cout << ((SymbolType*)expr)->value << std::endl;
         break;
     }
-    case T_Double:{
-        std::cout << ((NumberDoubleType*)result)->value << std::endl;
+    case T_String: {
+        std::cout << ((StringType*)expr)->value << std::endl;
         break;
     }
-    case T_Char:{
-        std::cout << ((CharType*)result)->value << std::endl;
+    case T_Char: {
+        std::cout << ((CharType*)expr)->value << std::endl;
         break;
     }
-    case T_Symbol:{
-        std::cout << ((SymbolType*)result)->value << std::endl;
+    case T_Bool: {
+        std::cout << ((BoolType*)expr)->value << std::endl;
         break;
     }
-    case T_List:{
-        ((ListType*)result)->value->GetListData();
+    case T_List: {
+        ((ListType*)expr)->value->GetListData();
         break;
     }
+    default:
+        break;
     }
 }

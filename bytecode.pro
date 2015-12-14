@@ -13,6 +13,8 @@ SOURCES += main.cpp \
 HEADERS += \
     stack.h \
     type.h \
-    vlist.h
+    vlist.h \
+    saveload.h \
+    types.h
 
 

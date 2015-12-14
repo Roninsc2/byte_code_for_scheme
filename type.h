@@ -15,21 +15,22 @@ enum EType {
     T_Bool,//5
     T_List, //6
     T_Ident,//7
+    T_Func,//8
+    T_CallFunc,//9
+    T_None
 };
 
 class ExprType {
 public:
     virtual ~ExprType(){}
     EType Type;
-    size_t level;
 };
 
 class NumberIntType : public ExprType {
 
 public:
-    NumberIntType(int val, size_t lvl) : value(val) {
+    NumberIntType(int val) : value(val) {
         Type = T_Int;
-        level = lvl;
     }
 
 public:
@@ -39,9 +40,8 @@ public:
 class NumberDoubleType : public ExprType {
 
 public:
-    NumberDoubleType(double val, size_t lvl) : value(val) {
+    NumberDoubleType(double val) : value(val) {
         Type = T_Double;
-        level = lvl;
     }
 
 public:
@@ -52,9 +52,8 @@ public:
 class IdentType : public ExprType {
 
 public:
-    IdentType(std::string val, size_t lvl) : name(val) {
+    IdentType(std::string val) : name(val) {
         Type = T_Ident;
-        level = lvl;
     }
     ~IdentType() {
         delete value;
@@ -68,9 +67,8 @@ public:
 class StringType : public ExprType {
 
 public:
-    StringType(std::string val, size_t lvl) : value(val) {
+    StringType(std::string val) : value(val) {
         Type = T_String;
-        level = lvl;
     }
 
 public:
@@ -80,9 +78,8 @@ public:
 class CharType : public ExprType {
 
 public:
-    CharType(char val, size_t lvl) : value(val) {
+    CharType(char val) : value(val) {
         Type = T_Char;
-        level = lvl;
     }
 
 public:
@@ -92,9 +89,8 @@ public:
 class BoolType : public ExprType {
 
 public:
-    BoolType(bool val, size_t lvl) : value(val) {
+    BoolType(bool val) : value(val) {
         Type = T_Bool;
-        level = lvl;
     }
 
 public:
@@ -104,9 +100,8 @@ public:
 class SymbolType : public ExprType {
 
 public:
-    SymbolType(std::string val, size_t lvl) : value(val) {
+    SymbolType(std::string val) : value(val) {
         Type = T_Symbol;
-        level = lvl;
     }
 
 public:
@@ -116,35 +111,57 @@ public:
 class ListType : public ExprType {
 
 public:
-    ListType(VList* val, size_t lvl) : value(val) {
+    ListType(VList* val) : value(val) {
         Type = T_List;
-        level = lvl;
     }
 
 public:
     std::shared_ptr<VList> value;
 };
 
+class CallExprType : public ExprType {
+public:
+  std::string Callee;
+  std::vector< ExprType* > Args;
 
-class PrototypeType {
 public:
-  PrototypeType(const std::string &name, const std::map<std::string, IdentType*> &args)
-    : Name(name), Args(args)
+  CallExprType(const std::string &callee, std::vector< ExprType* > &args)
+    : Callee(callee), Args(args)
   {
+      Type = T_CallFunc;
   }
+};
+
+class NoneType : public ExprType {
 public:
-  std::string Name;
-  std::map<std::string, IdentType*> Args;
+  NoneType()
+  {
+      Type = T_None;
+  }
 };
 
 
-class FunctionType {
+
+class PrototypeType {
 public:
-  FunctionType(PrototypeType* proto,  std::vector< std::string > body)
-    : Proto(proto), Body(body)
-  {
-  }
+    PrototypeType(const std::string &name, const std::map<std::string, IdentType*> &args)
+        : Name(name), Args(args)
+    {
+    }
 public:
-  std::shared_ptr< PrototypeType >Proto;
-  std::vector< std::string >Body;
+    std::string Name;
+    std::map<std::string, IdentType*> Args;
+};
+
+
+class FunctionType: public ExprType {
+public:
+    FunctionType(PrototypeType* proto,  std::string body)
+        : Proto(proto), Body(body)
+    {
+        Type = T_Func;
+    }
+public:
+    std::shared_ptr< PrototypeType >Proto;
+    std::string Body;
 };

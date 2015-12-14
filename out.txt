@@ -1,4 +1,0 @@
-ADD 0 1
-ADD 0 2
-ADD 1 3
-DOFUNC +

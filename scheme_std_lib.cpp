@@ -36,30 +36,30 @@ TPairType* GetPairType(ExprType* expr) {
 
 
 
-VList* list(std::vector< ExprType* > exprs) {
+ExprType* list(std::vector< ExprType* > exprs) {
     if (!exprs.size()) {
-        return (new VList(TPairTypePtr(nullptr)));
+        return (new ListType(new VList(TPairTypePtr(nullptr))));
     } else {
         VList* list = new VList(TPairTypePtr(GetPairType(exprs[0])));
         for (size_t i = 1; i < exprs.size(); i++) {
             list->InsertAfter(new VList(TPairTypePtr(GetPairType(exprs[i]))));
         }
-        return list;
+        return (new ListType(list));
     }
 }
 
-VList* cons(std::vector <ExprType*> expr) {
+ExprType* cons(std::vector <ExprType*> expr) {
     if (!expr.size()) {
-        return new VList(TPairTypePtr(nullptr));
+        return (new ListType(new VList(TPairTypePtr(nullptr))));
     }
     VList* list = new VList(TPairTypePtr(GetPairType(expr[0])));
     list->ConvetToPair(GetPairType(expr[1]));
-    return list;
+    return (new ListType(list));
 }
 
-VList* append(std::vector<ExprType*> expr) {
+ExprType* append(std::vector<ExprType*> expr) {
     if (!expr.size()) {
-        return (new VList(TPairTypePtr(nullptr)));
+        return (new ListType(new VList(TPairTypePtr(nullptr))));
     }
     TPairType* list = GetPairType(expr[0]);
     if (list->GetType() != PT_List) {
@@ -75,16 +75,16 @@ VList* append(std::vector<ExprType*> expr) {
     }
     TPairType* last = GetPairType(expr[expr.size()-1]);
     if (last->GetType() == PT_List && ((TPairTypeList*)last)->GetValue()->isList()) {
-       ((TPairTypeList*)list)->GetValue()->InsertAfter(((TPairTypeList*)last)->GetValue());
+        ((TPairTypeList*)list)->GetValue()->InsertAfter(((TPairTypeList*)last)->GetValue());
     } else {
         ((TPairTypeList*)list)->GetValue()->ConvetToPair(last);
     }
-    return ((TPairTypeList*)list)->GetValue();
+    return (new ListType(((TPairTypeList*)list)->GetValue()));
 }
 
 
 
-double plus(std::vector<ExprType*> expr) {
+ExprType* plus(std::vector<ExprType*> expr) {
     double result = 0;
     if (!expr.size()) {
         //error
@@ -99,10 +99,10 @@ double plus(std::vector<ExprType*> expr) {
             }
         }
     }
-    return result;
+    return (new NumberDoubleType(result));
 }
 
-double minus(std::vector<ExprType*> expr) {
+ExprType* minus(std::vector<ExprType*> expr) {
     double result = 0;
     if (!expr.size()) {
         //error
@@ -132,10 +132,10 @@ double minus(std::vector<ExprType*> expr) {
             //error
         }
     }
-    return result;
+    return (new NumberDoubleType(result));
 }
 
-double mult(std::vector<ExprType*> expr) {
+ExprType* mult(std::vector<ExprType*> expr) {
     double result = 1;
     if (!expr.size()) {
         //error
@@ -150,20 +150,19 @@ double mult(std::vector<ExprType*> expr) {
             }
         }
     }
-    return result;
+    return (new NumberDoubleType(result));
 }
 
-std::pair<std::string, IdentType* > defineFun(std::vector<ExprType*> expr) {
+ExprType* defineFun(std::vector<ExprType*> expr) {
     if (expr.size() < 2) {
         //error
     } else if (expr[0]->Type == T_Ident && expr.size() == 2) {
-        std::pair<std::string, IdentType* > pair(((IdentType*)expr[0])->name, (IdentType*)expr[1]);
-        return pair;
+        ((IdentType*)expr[0])->value = expr[1];
     }
 }
 
 
-double division(std::vector<ExprType*> expr) {
+ExprType* division(std::vector<ExprType*> expr) {
     double result = 1;
     if (!expr.size()) {
         //error
@@ -193,7 +192,41 @@ double division(std::vector<ExprType*> expr) {
             //error
         }
     }
-    return result;
+    return (new NumberDoubleType(result));
+}
+
+ExprType* ifelse(std::vector<ExprType*> expr) {
+    if (((BoolType*)expr[0])->value) {
+        return expr[1];
+    } else {
+        return expr[2];
+    }
+}
+
+ExprType* equally(std::vector<ExprType*> expr) {
+    if (expr.size() < 2) {
+        //error
+    } else {
+        double result;
+        if (expr[0]->Type == T_Int) {
+            result = ((NumberIntType*)expr[0])->value;
+        } else if (expr[0]->Type == T_Double) {
+            result = ((NumberDoubleType*)expr[0])->value;
+        } else {
+            //error
+        }
+        for (size_t i = 1; i < expr.size(); i++) {
+            if (expr[i]->Type == T_Int && ((NumberIntType*)expr[i])->value != result) {
+                return (new BoolType(false));
+            } else if (expr[i]->Type == T_Double && ((NumberDoubleType*)expr[i])->value != result) {
+                return (new BoolType(false));
+            } else {
+                //error
+            }
+        }
+        return (new BoolType(true));
+    }
+
 }
 
 
